@@ -124,6 +124,116 @@ class FaceRecognitionApp {
         }
     }
 
+    // Do a simple template-match focused on the pattern's nose area.
+    // Returns object compatible with the existing simulateFaceDetection result.
+    async matchPatternNose(searchImg, patternImg) {
+        try {
+            // Downscale for speed while keeping aspect ratio
+            const maxDim = 300;
+            const scaleSearch = Math.min(1, maxDim / Math.max(searchImg.width, searchImg.height));
+            const scalePattern = Math.min(1, maxDim / Math.max(patternImg.width, patternImg.height));
+
+            const sW = Math.max(1, Math.round(searchImg.width * scaleSearch));
+            const sH = Math.max(1, Math.round(searchImg.height * scaleSearch));
+            const pW = Math.max(1, Math.round(patternImg.width * scalePattern));
+            const pH = Math.max(1, Math.round(patternImg.height * scalePattern));
+
+            // Create canvases
+            const sCanvas = document.createElement('canvas');
+            sCanvas.width = sW;
+            sCanvas.height = sH;
+            const sCtx = sCanvas.getContext('2d');
+            sCtx.drawImage(searchImg, 0, 0, sW, sH);
+            const sData = sCtx.getImageData(0, 0, sW, sH).data;
+
+            const pCanvas = document.createElement('canvas');
+            pCanvas.width = pW;
+            pCanvas.height = pH;
+            const pCtx = pCanvas.getContext('2d');
+            pCtx.drawImage(patternImg, 0, 0, pW, pH);
+            const pData = pCtx.getImageData(0, 0, pW, pH).data;
+
+            // Convert to grayscale arrays
+            const sGray = new Float32Array(sW * sH);
+            for (let i = 0, j = 0; i < sData.length; i += 4, j++) {
+                sGray[j] = 0.299 * sData[i] + 0.587 * sData[i + 1] + 0.114 * sData[i + 2];
+            }
+            const pGray = new Float32Array(pW * pH);
+            for (let i = 0, j = 0; i < pData.length; i += 4, j++) {
+                pGray[j] = 0.299 * pData[i] + 0.587 * pData[i + 1] + 0.114 * pData[i + 2];
+            }
+
+            // Estimate nose position within pattern as approx (centerX, centerY * 0.55)
+            const nosePx = Math.round(pW * 0.5);
+            const nosePy = Math.round(pH * 0.55);
+
+            // Define search bounds (so the pattern fits)
+            const maxX = sW - pW;
+            const maxY = sH - pH;
+            if (maxX < 0 || maxY < 0) {
+                return { found: false };
+            }
+
+            // Slide pattern over search image with step for speed
+            const step = Math.max(1, Math.round(Math.min(pW, pH) / 8));
+            let best = { score: Infinity, x: 0, y: 0 };
+
+            for (let sy = 0; sy <= maxY; sy += step) {
+                for (let sx = 0; sx <= maxX; sx += step) {
+                    // Compute sum of absolute differences (SAD)
+                    let sad = 0;
+                    // Sample pixels with stride to speed up
+                    const strideX = Math.max(1, Math.round(pW / 16));
+                    const strideY = Math.max(1, Math.round(pH / 16));
+                    for (let py = 0; py < pH; py += strideY) {
+                        const sRow = (sy + py) * sW;
+                        const pRow = py * pW;
+                        for (let px = 0; px < pW; px += strideX) {
+                            const sIdx = sRow + (sx + px);
+                            const pIdx = pRow + px;
+                            const diff = sGray[sIdx] - pGray[pIdx];
+                            sad += Math.abs(diff);
+                        }
+                    }
+
+                    if (sad < best.score) {
+                        best = { score: sad, x: sx, y: sy };
+                    }
+                }
+            }
+
+            // Compute normalized score -> confidence (higher is better)
+            // Lower SAD means better match. We normalize by pattern size.
+            const norm = best.score / ( (pW / Math.max(1, Math.round(pW / 16))) * (pH / Math.max(1, Math.round(pH / 16))) * 255 );
+            const confidence = Math.max(0, Math.min(100, Math.round((1 - norm) * 100)));
+
+            // Decide threshold for "found" (tunable)
+            const found = confidence > 45; // require at least ~45% confidence
+
+            if (!found) return { found: false };
+
+            // Map coordinates back to original search image scale
+            const matchedX = best.x / scaleSearch;
+            const matchedY = best.y / scaleSearch;
+            const noseX_orig = (matchedX + nosePx / scalePattern) ;
+            const noseY_orig = (matchedY + nosePy / scalePattern) ;
+
+            // Choose radius relative to pattern face size
+            const radius = Math.max(20, Math.round(Math.max(patternImg.width, patternImg.height) * 0.12));
+
+            return {
+                found: true,
+                x: noseX_orig,
+                y: noseY_orig,
+                radius,
+                confidence
+            };
+        } catch (err) {
+            console.error('matchPatternNose error', err);
+            return { found: false };
+        }
+    }
+
     async recognizeFace() {
         if (!this.patternImage || !this.searchImage) {
             alert('Proszę załadować oba zdjęcia');
