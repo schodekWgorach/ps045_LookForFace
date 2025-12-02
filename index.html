@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poszukiwacz Twarzy</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Poszukiwacz</h1>
+            <p>System rozpoznawania twarzy</p>
+        </header>
+        
+        <main>
+            <div class="images-container">
+                <div class="image-box">
+                    <h3>Wzór twarzy</h3>
+                    <div class="image-upload-area" id="patternUploadArea">
+                        <input type="file" id="patternInput" accept="image/*" style="display: none;">
+                        <div class="upload-placeholder">
+                            <span>+</span>
+                            <p>Kliknij aby załadować wzór twarzy</p>
+                        </div>
+                        <img id="patternImage" style="display: none;" alt="Wzór twarzy">
+                    </div>
+                </div>
+                
+                <div class="image-box">
+                    <h3>Zdjęcie do przeszukania</h3>
+                    <div class="image-upload-area" id="searchUploadArea">
+                        <input type="file" id="searchInput" accept="image/*" style="display: none;">
+                        <div class="upload-placeholder">
+                            <span>+</span>
+                            <p>Kliknij aby załadować zdjęcie do przeszukania</p>
+                        </div>
+                        <img id="searchImage" style="display: none;" alt="Zdjęcie do przeszukania">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button id="recognizeBtn" disabled>
+                    <span class="btn-text">Rozpoznaj</span>
+                    <span class="btn-loading" style="display: none;">Przetwarzanie...</span>
+                </button>
+            </div>
+            
+            <div class="result-container" id="resultContainer" style="display: none;">
+                <h3>Wynik rozpoznawania</h3>
+                <div class="result-image-container">
+                    <canvas id="resultCanvas"></canvas>
+                </div>
+                <div class="result-info">
+                    <p id="resultText"></p>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
